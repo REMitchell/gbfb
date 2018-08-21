@@ -6,7 +6,7 @@ import json
 import time
 import csv
 from recipe import Recipe
-from ingredient import ingredient
+from ingredient import Ingredient
 from ingredientParser import IngredientParser
 
 class Scraper:
@@ -26,36 +26,54 @@ class Scraper:
         bs = BeautifulSoup(req.text, "html.parser")
         return bs
     
-    def safeJsonGet(self, content, path):
+    def safeJsonGet(self, content, path, default=None):
         for item in path:
             if item in content:
                 content = content[item]
             else:
-                return None
+                return default
         return content
 
     def extractCookingLight(self, url):
         bs = self.getPage(url)
         content = json.loads(bs.find('script', {'type': 'application/ld+json'}).text)
         content = content[-1]
-        print(content)
         recipe = Recipe()
         recipe.title = self.safeJsonGet(content, ['name'])
-        recipe.author = self.safeJsonGet(content, ['author', 'name'])
+        recipe.author = self.safeJsonGet(content, ['author', 0, 'name'])
         recipe.url = url
         recipe.date = self.safeJsonGet(content, ['datePublished'])
         recipe.description = self.safeJsonGet(content, ['description'])
         recipe.directions = self.safeJsonGet(content, ['recipeInstructions'])
         recipe.prepTime = self.safeJsonGet(content, ['totalTime'])
-
+        print(self.safeJsonGet(content, ['recipeIngredient'], []))
+        recipe.ingredients = [IngredientParser(text).toIngredient() for text in self.safeJsonGet(content, ['recipeIngredient'], [])]
+        return recipe
 
     def cookingLight(self):
         siteListing = self.getPage('https://www.cookinglight.com/recipe-sitemap.xml')
         urls = siteListing.findAll('loc')
         for url in urls[:1]:
             print(url)
-            self.extractCookingLight(url.text)
+            recipe = self.extractCookingLight(url.text)
+            recipe.print()
 
-        
+    def extractFoodNetwork(url):
+        print(stub)
+
+
+    def foodNetwork(self):
+        # https://www.foodnetwork.com/recipes/recipes-a-z/123/p/1
+        listings = ['123', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'XYZ']
+        for listing in listings:
+            for i in range(1, 20):
+                bs = self.getPage('https://www.foodnetwork.com/recipes/recipes-a-z/'+listing+'/p/'+str(2))
+                recipeLinks = bs.findAll('li', {'class':'m-PromoList__a-ListItem'})
+                if len(recipeLinks) == 0:
+                    continue
+                for recipeLink in recipeLinks:
+                    self.extractFoodNetwork(recipeLink.find('a').attrs['href'])
+
 scraper = Scraper()
-scraper.cookingLight()
+#scraper.cookingLight()
+scraper.foodNetwork()
